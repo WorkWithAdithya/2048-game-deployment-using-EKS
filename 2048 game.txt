@@ -1,0 +1,85 @@
+EKS -> setting up of k8 is tedious , error prone and managing the k8 cluster if anything falls apart is difficult / debugging the problem is difficult
+
+EKS provides managed k8 cluster wrt to control/master plane
+
+For worker node we can either use EC2 instances or we can use Amazon fargate (AWS serverless compute just like lambda) which helps in managing of containers
+
+
+If we use EC2 we have to manage the high availability ,monitoring etc
+But in fargate it is self managed
+
+
+Here we are going to use ingress
+How ingress works -> 
+-> So lets say we are having pods in in a cluster 
+-> Each application will be in private VPC so user cannot access it 
+-> so we will be creating a ingress file which will keep track on the resources  .
+-> this will generate an URL (e.g example.com)
+-> This still cannot be accessed so ingress controller will create a elastic load-balencer in the public subnet which can be accessed by the user.
+
+
+Why should we use ingress instead of load-balencer service?
+In service if we use load-balencer the cost will be pretty high so to reduce the cost we will be ingress.
+ 
+Pre-requisites - kubectl , eksctl , amazon cli must be installed in your local machine (kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+(docs.aws.amazon.com/eks/latest/eksctl/installation.html)
+(https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+
+
+terminal -> aws configure (give  the  access keys generated)
+
+
+Why we are using command line instead of AWS??
+Becoz it is easy and it automatically creates vpc,subnets, cluster etc whereas in aws it is lengthy process
+
+--> eksctl create cluster --name demo-cluster --region us-east-1 --fargate
+--> refresh amazon eks the cluster will be present there as well
+
+--> aws eks update-kubeconfig --name demo-cluster --region us-east-1 (updating the kubeconfig)
+
+--> eksctl create fargateprofile \
+    --cluster demo-cluster \
+    --region us-east-1 \
+    --name alb-sample-app \
+    --namespace game-2048 ()
+    
+    
+--> kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.5.4/docs/examples/2048/2048_full.yaml (applying inside a pod)
+
+--> eksctl utils associate-iam-oidc-provider --cluster $cluster_name --approve (attaching an iam role so that the pods can talk to some aws resources )
+
+--> curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.11.0/docs/install/iam_policy.json(IAM Policy download)
+
+--> aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://iam_policy.json (creating an iam policy)
+    
+--> eksctl create iamserviceaccount   --cluster=demo-cluster   --namespace=kube-system   --name=aws-load-balancer-controller   --role-name AmazonEKSLoadBalancerControllerRole   --attach-policy-arn=arn:aws:iam::570192317962:policy/AWSLoadBalancerControllerIAMPolicy   --approve 
+(here we are creating an iam role )
+
+
+here we are using help (helm acts as apt for k8 . Instead of managing multiple yaml files manually helm packages into a single unit called chart) 
+--> helm repo add eks https://aws.github.io/eks-charts
+
+--> helm install aws-load-balancer-controller eks/aws-load-balancer-controller -n kube-system \
+  --set clusterName=<your-cluster-name> \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=<your-region> \
+  --set vpcId=<your-vpc-id> (installing aws load-balencer)
+  
+  
+  --> kubectl get deployment -n kube-system aws-load-balancer-controller
+  
+  
+  Open EC2 -> load baencer -> copy dns and paste the application will be loaded
+
+
+
+
+
+
+
+
+
+
